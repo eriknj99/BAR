@@ -1,0 +1,160 @@
+#!/usr/bin/python
+import os
+from time import sleep
+from termcolor import colored
+import numpy as np
+
+def drawGraph(lable, unit, val, max, minimum=0,color="white", precision=3, numTicks=10, center=False):
+        
+        # Eliminate overflow
+        if(val > max):
+            max = val
+
+        # Translate min to 0 to make everything easier
+        # Only the displayed data will be translated back
+        val -= minimum
+        max -= minimum
+
+        numTicks = 10 # The number of ticks to display (Excluding 0) 
+        tick = '┼'
+        hLine = '─'
+        vLine = '│'
+        c0 = '├'
+        c1 = '┤'
+        c2 = '└'
+        c3 = '┘'
+        blocks = ["","▏","▎","▍","▌","▋","▊","▉","█"]
+        blockSpace = ' '
+        space = ' '
+        
+
+        output = ""
+
+        rows_str, columns_str = os.popen('stty size', 'r').read().split()
+        columns = int(columns_str)
+
+        # Generate Lables
+        tick_lables = []
+        float_tick_lables = []
+        len_tick_lables = 0
+        for i in range(0,numTicks + 1):
+            float_tick_lables.append(round((i * max/numTicks), precision))
+            
+            # Translate the lable strings back to the correct value
+            tick_lables.append(f"{(float_tick_lables[i] + minimum):g}{unit}") 
+            
+            len_tick_lables += len(tick_lables[i]) 
+
+        # Generate tick spacing strings  
+        tick_spacing_size = int((columns - len_tick_lables) / numTicks)
+        tick_lable_space = space * tick_spacing_size
+        tick_space = hLine * tick_spacing_size
+       
+        # Generate spacing to center the graph
+        len_tick_lable_line = (tick_spacing_size * numTicks) + len_tick_lables
+        if(center):
+            centering_string = space * int((columns - len_tick_lable_line)/2)        
+        else:
+            centering_string = ""
+
+        #Move tick lable line to the center
+        output += centering_string
+
+        # Generate tick lable line 
+        for i in range(numTicks):
+            output+=(tick_lables[i]) + tick_lable_space
+        
+        output += (tick_lables[len(tick_lables)-1])
+        
+        #Generate tick line
+        output += "\n" + centering_string # Center the new line
+        output += c0 # Add the first tick char
+        for i in range(numTicks):
+            offset = len(tick_lables[i]) -1  # Account for the length of the tick lable  
+            output += tick_space + (offset * hLine)
+            # Only add a tick if it is not the last tick 
+            if(i != numTicks-1):
+                output += tick
+
+        output += c1# Add the last tick char
+       
+        # Generate the data line
+
+        # Note the graph is non liniear! The sections before the first tick and after the last tick are .5 characters less than the section in between. This code accounts for this.
+
+        output += "\n" + centering_string
+        output += vLine # Add the beginning of the bar
+        
+        # The length of the usable section of the data line. Accounting for the start and end of the bar
+        len_data_line = len_tick_lable_line - len(tick_lables[numTicks]) - 1        
+        
+        # The number of chars in the first section 
+        charsSection1 = (tick_spacing_size + 1.5)
+        
+        # The number of chars between each tick in the second section
+        charsSection2 = tick_spacing_size + 4
+
+        # The number of chars in the third section 
+        charsSection3 = tick_spacing_size + 3.5 
+
+        section = 0
+        # If value is in the first section scale for the first section
+        if(val <= float_tick_lables[1]):
+            bar_len = charsSection1 * (val / float_tick_lables[1])
+            section = 1
+
+        # If value is in the second section scale for the second section append the fist section
+        if(val > float_tick_lables[1] and val <= float_tick_lables[numTicks - 1]):
+            bar_len = charsSection1 + (charsSection2 * ((val - float_tick_lables[1]) / float_tick_lables[1]))
+            section = 2
+            
+        # If value is in the third section scale for the third section, append the first and second sections
+        if(val > float_tick_lables[numTicks - 1]):
+            s1s2 = charsSection1 + (charsSection2 * (float_tick_lables[numTicks - 1]))
+            bar_len = s1s2 + (charsSection3 * ((val - float_tick_lables[numTicks]) / float_tick_lables[1]))
+            section = 3
+
+        # If the bar extends further than the allowed bounds cut it off.
+        # This adds some (acceptable) display innacuracy for values close to the maximum 
+        if(bar_len < len_data_line):
+            # The index of the partial block character to get as close to the ideal length as possible
+            partial_block_index = int((bar_len - int(bar_len)) * 8) 
+        else:
+            partial_block_index = 0
+        
+        # Generate the full blocks
+        for i in range(int(bar_len)):
+            output += colored(blocks[8], color)
+
+        # Generate the partial block
+        output += colored(blocks[partial_block_index], color)
+       
+        # Add spaces after blocks
+        output += blockSpace * ((len_data_line - int(bar_len)) - min(1, partial_block_index))
+        
+        # Add end of data line
+        output += vLine
+
+        # Add the bottom line
+        output += "\n" + centering_string + c2 + (len_data_line*hLine) + c3
+      
+        # Add the info line
+        output = f"{centering_string}{lable} {round((val + minimum), precision):g}{unit} \n" + output
+        output += f"\n{float_tick_lables[numTicks]}\n"
+        output += f"{charsSection1}\n"
+        output += f"{charsSection2}\n"
+        output += f"{charsSection3}\n"
+
+
+        return output    
+
+
+
+min = 0
+max = 20
+
+step = 1
+
+for i in np.arange(min, max, step):
+    data = drawGraph("Test", "u", i, max, minimum=min,color="blue")
+    print(data)
