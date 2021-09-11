@@ -1,23 +1,7 @@
 #!/usr/bin/python
 import os
-from time import sleep
 from termcolor import colored
-import numpy as np
 import builtins
-
-
-
-
-def generatePartialBlock(percent)->str:
-    filtered_val = float(min(end, max(start, val)))
-    blocks = ["","▏","▎","▍","▌","▋","▊","▉","█"]
-    percent = (filtered_val - start) / end
-    block_index = int(percent * (len(blocks) - 1))
-    return blocks[block_index]
-
-def generateTitleLine(label:str, unit:str, val:float, precision:int):
-    return f"{label} {round((val), precision):g}{unit} \n" 
-
 
 
 def drawGraph(label:str, unit:str, val:float, start:float, end:float, color="white", precision=3, numTicks=10, length=-1):
@@ -61,7 +45,7 @@ def drawGraph(label:str, unit:str, val:float, start:float, end:float, color="whi
 
 
         # Generate the title line
-        output += f"{generateTitleLine(label,unit, val + start, precision)}"
+        output += f"{label} {round((val), precision):g}{unit} \n"
 
         # Generate tick labels
         tick_labels = []
