@@ -4,17 +4,29 @@ from time import sleep
 from termcolor import colored
 import numpy as np
 import builtins
-def drawGraph(lable, unit, val, min, max, color="white", precision=3, numTicks=10, center=False):
-        
-        # Eliminate overflow
-        if(val > max):
-            max = val
 
+
+
+
+def generatePartialBlock(percent)->str:
+    filtered_val = float(min(end, max(start, val)))
+    blocks = ["","▏","▎","▍","▌","▋","▊","▉","█"]
+    percent = (filtered_val - start) / end
+    block_index = int(percent * (len(blocks) - 1))
+    return blocks[block_index]
+
+def generateTitleLine(label:str, unit:str, val:float, precision:int):
+    return f"{label} {round((val), precision):g}{unit} \n" 
+
+
+
+def drawGraph(label:str, unit:str, val:float, start:float, end:float, color="white", precision=3, numTicks=10, length=-1):
+        
         # Translate min to 0 to make everything easier
         # Only the displayed data will be translated back
-        val -= min
-        max -= min
 
+        filtered_val = float(min(end, max(start, val)))
+        
         tick = '┼'
         hLine = '─'
         vLine = '│'
@@ -22,94 +34,112 @@ def drawGraph(lable, unit, val, min, max, color="white", precision=3, numTicks=1
         c1 = '┤'
         c2 = '└'
         c3 = '┘'
+        c4 = '┌'
+        c5 = '┐'
         blocks = ["","▏","▎","▍","▌","▋","▊","▉","█"]
-        blockSpace = ' '
+        blockSpace = '-'
         space = ' '
         
         output = ""
-
-        rows_str, columns_str = os.popen('stty size', 'r').read().split()
-        columns = int(columns_str)
-
-        # Generate Lables
-        tick_lables = []
-        float_tick_lables = []
-        len_tick_lables = 0
-        for i in range(0,numTicks + 1):
-            float_tick_lables.append(round((i * max/numTicks), precision))
-            
-            # Translate the lable strings back to the correct value
-            tick_lables.append(f"{(float_tick_lables[i] + min):g}{unit}") 
-            
-            len_tick_lables += len(tick_lables[i]) 
-
-        # Generate tick spacing strings  
-        tick_spacing_size = int(((columns - len_tick_lables) / (numTicks)) + .4) 
-        tick_space = hLine * tick_spacing_size
-       
-        len_tick_lable_line = 0
-        for i in range(numTicks):
-            len_tick_lable_line += len((tick_lables[i]) + space * (tick_spacing_size - (len(tick_lables[i]) -1)))
         
-        # Generate spacing to center the graph
-        if(center):
-            centering_string = space * int((columns - len_tick_lable_line)/2)
+        # Figure out how many columns to use
+        columns = 100 
+        if(length < 0):
+            size = os.get_terminal_size()
+            terminal_columns = size.columns  
+            length = max(-1,length)
+            columns = int((length * -1) * terminal_columns)
+            last_tick_label = f"{round(float(end),precision):g}{unit}".replace(" ", "")
+            columns = min(columns, terminal_columns - (len(last_tick_label)))
         else:
-            centering_string = ""
-
-        #Move tick lable line to the center
-        output += centering_string
-
-        # Generate tick lable line 
-        for i in range(numTicks):
-                output+=(tick_lables[i]) + space * (tick_spacing_size - (len(tick_lables[i]) -1))
-        output += tick_lables[numTicks] 
+            columns = int(length)
        
-        #Generate tick line
-        output += "\n" + centering_string # Center the new line
-        output += c0 # Add the first tick char
-        for i in range(numTicks):
-            offset = len(tick_lables[i]) -1  # Account for the length of the tick lable  
-            output += tick_space  
-            # Only add a tick if it is not the last tick 
-            if(i != numTicks-1):
-                output += tick
 
-        output += c1# Add the last tick char
-       
-        # Generate the data line
-        output += "\n" + centering_string
-        output += vLine # Add the beginning of the bar
+        # columns must be evenly divisible by numTicks
+        columns -= columns % numTicks
+
+
+
+        # Generate the title line
+        output += f"{generateTitleLine(label,unit, val + start, precision)}"
+
+        # Generate tick labels
+        tick_labels = []
+        tick_val = start
+        for i in range(numTicks + 1):
+            tick_labels.append(tick_val)                
+            tick_val += (end - start) / (numTicks)
+
+
+        # Generate the tick labels in the correct position 
+        tick_spacing = int((columns - numTicks) / numTicks)
+        for i in range(numTicks):
+            formatted_label = f"{round(float(tick_labels[i]),precision):g}{unit}".replace(" ", "")
+            output += formatted_label + (" " * (tick_spacing - len(formatted_label) + 1)) 
         
-        # The length of the usable section of the data line. Accounting for the start and end of the bar
-        len_data_line = len_tick_lable_line -1        
-        len_filled = 0
-        ideal_block_len = (len_data_line+1) * (val/max) -1 
+        output+=(f"{round(float(end),precision):g}{unit}".replace(" ", ""))
+        output += "\n"
+        
+        # Generate the tick line
+        tick_line = c4
+        for i in range(numTicks-1):
+            tick_line += (hLine * tick_spacing) + tick
+        tick_line += hLine * tick_spacing
+        tick_line += c5
+        tick_line += "\n"
+        output += tick_line
+        
+        # Calculate a dictionary that maps values to number of chars
+        tick_locations = {start:0}
+        current_length = 0
+        for i in range(1,numTicks):
+            tick_index = tick_line.index(tick)
+            tick_locations[tick_labels[i]] =  (tick_index - .5) + current_length
+            current_length += tick_index + 1
+            tick_line = tick_line[tick_index+1:]
+        tick_locations[end] = columns - 1
 
-        output += colored(blocks[8], color) * int(ideal_block_len)
-        len_filled += int(ideal_block_len)
 
-        remainder = (ideal_block_len + .5 - int(ideal_block_len))
-         
-        if(remainder > 1):
-            output += colored(blocks[8], color)
-            remainder-=1
-            len_filled += 1
+        
+        output += vLine 
+        
+        
+        # Generate the data BAR
+        
+        # Find what sector the value is in 
+        sector = 0
+        for i in range(len(tick_labels) - 1):
+            if(val > tick_labels[i] and val <= tick_labels[i+1]):
+                sector = i
+    
+        bar_length = 0
 
-        partial_block_index = 0
-        if(ideal_block_len < len_data_line - 1):
-            partial_block_index = builtins.max(0,int(remainder * 8))
-            output += colored(blocks[partial_block_index], color)
-            len_filled += len(blocks[partial_block_index])
+        # Get the number of characters to fill the previous sectors
+        bar_length += tick_locations[tick_labels[sector]]
 
-        output += space * (len_data_line - len_filled)
+        # Get the number of characters to fill the current sector
+        percent_in_sector = (val - tick_labels[sector]) / (tick_labels[sector + 1] - tick_labels[sector]) 
+        characters_in_sector = tick_locations[tick_labels[sector + 1]] - tick_locations[tick_labels[sector]]
+        bar_length += percent_in_sector * characters_in_sector
+        
+        # Fill bar_chars with bar_length characters
+        bar_chars = ""
+        remainder = bar_length - int(bar_length)
+        bar_chars += blocks[8] * int(bar_length)
+        block_index = int(remainder * (len(blocks)))
+        bar_chars += blocks[block_index]        
+        
+        # Fill in the rest of the data BAR with spaces and the end char
+        output += colored(bar_chars, color)
+        output += ((columns - len(bar_chars)) - 1) * blockSpace
         output += vLine
+        
 
-        # Add the bottom line
-        output += "\n" + centering_string + c2 + (len_data_line*hLine) + c3
-      
-        # Add the info line
-        output = f"{centering_string}{lable} {round((val + min), precision):g}{unit} \n" + output
+        # Generate the bottom of the bar
+        output += "\n"
+        output += c2
+        output += hLine * (columns - 1)
+        output += c3
 
         return output    
 
